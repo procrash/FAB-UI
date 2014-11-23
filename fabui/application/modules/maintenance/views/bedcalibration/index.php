@@ -45,10 +45,10 @@
 			<div class="well">
 
 				<div class="row">
-					<div class="col-sm-6 text-center margin-bottom-10">
+					<div class="col-sm-4 text-center margin-bottom-10">
 						<img style="max-width: 50%; display: inline;" class="img-responsive" src="<?php echo module_url('maintenance') ?>assets/img/bedcalibration/2.png" />
 					</div>
-					<div class="col-sm-6 ">
+					<div class="col-lg-8 ">
 						<h1 class="text-center" ><span class="badge bg-color-blue txt-color-white">2</span></h1>
 						<h4 class="text-center">Screw or unscrew following the indication given for each point.<br>
 					Green points are optimally leveled.<br>

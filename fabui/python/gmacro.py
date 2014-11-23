@@ -4,6 +4,7 @@ import sys
 import time, datetime
 import serial
 import json
+import temperature 
 #read config steps/units
 json_f = open("/var/www/fabui/config/config.json")
 units = json.load(json_f)
@@ -139,7 +140,9 @@ elif preset=="start_print":
 	macro("G90","ok",2,"setting abs position",0,verbose=False)
 	macro("G0 X5 Y5 Z30 F1500","ok",3,"Moving to oozing point",1)
 	#pre heating M104 S0
-	macro("M104 S180","ok",3,"Pre Heating Nozzle (fast) ",20)
+	#macro("M104 S180","ok",3,"Pre Heating Nozzle (fast) ",20)
+	preHeatExtruder()
+	trace("Pre Heating Nozzle (fast) ", log_trace)
 	macro("M140 S50","ok",3,"Pre Heating Bed (fast) ",20)
 	macro("M220 S100","ok",1,"Reset speed override",0.1,verbose=False)
 	macro("M92 E"+str(units['e']),"ok",1,"Setting extruder mode",0.1,verbose=False)
@@ -160,8 +163,10 @@ elif preset=="end_print_additive":
 	#note: movement here is done so it works with AUTO positioning (additive mode).
 	trace("Terminating...",log_trace)
 	macro("G90","ok",100,"Set Absolute movement",0.1,verbose=False)
-	macro("G0 X210 Y210 Z240 F10000","ok",100,"Moving to safe zone",0.1,verbose=False) #right top, normally Z=240mm
-	macro("M104 S0","ok",50,"Shutting down Extruder",1)
+	macro("G0 X210 Y210 Z200 F10000","ok",100,"Moving to safe zone",0.1,verbose=False) #right top, normally Z=240mm, Z=200 because otherwise plastic tube is ditched and motors seem to go over endstops...
+	#macro("M104 S0","ok",50,"Shutting down Extruder",1)
+	coolDownExtruder()
+	trace("Shuttind down Extruder", log_trace)
 	macro("M140 S0","ok",50,"Shutting down Heated Bed",1)
 	macro("M220 S100","ok",20,"reset speed override",0.1)
 	macro("M106 S0","ok",50,"Turning Fan off",1) #should be moved to firmware
@@ -269,7 +274,9 @@ elif preset=="unload_spool":
 	macro("G0 E-200 F200","ok",10,"Leaving the heating chamber (slow!)",60)
 	macro("G0 E-700 F550","ok",10,"Expelling filament",60)
 	macro("M82","ok",2,"Restoring absolute estrusion mode",0,verbose=False)
-	macro("M104 S0","ok",1,"Disabling Extruder",1)
+	#macro("M104 S0","ok",1,"Disabling Extruder",1)
+	coolDownExtruder()
+	trace("Disabling Extruder", log_trace)
 	
 #load spool from reel
 elif preset=="load_spool":
@@ -281,14 +288,18 @@ elif preset=="load_spool":
 	macro("M83","ok",5,"setting relative estrusion mode",0.1,verbose=False)
 	macro("G92 E0","ok",5,"setting extruder position to 0",0.1,verbose=False)
 	macro("M92 E"+str(units['e']),"ok",5,"Setting extruder mode",0.1,verbose=False)
-	macro("M104 S190","ok",5,"Heating Nozzle. Get ready to push...",5) #heating and waiting.
+	#macro("M104 S190","ok",5,"Heating Nozzle. Get ready to push...",5) #heating and waiting.
+	heatUpExtruder()
+	trace("Heating Nozzle. Get ready to push...", log_trace)
 	macro("M300","ok",5,"Start pushing!",3)
 	macro("G0 E110 F500","ok",1,"Loading filament (slow)",15)
 	macro("G0 E660 F700","ok",1,"Loading filament (fast)",20)
 	macro("M109 S220","ok",100,"waiting to get to temperature...",1) #heating and waiting.
 	macro("G0 E100 F200","ok",1,"Entering heating chamber (slow)",5)
 	macro("M82","ok",1,"setting back absolute estrusion",0,verbose=False)
-	macro("M104 S0","ok",1,"Disabling Extruder",0.1)
+	#macro("M104 S0","ok",1,"Disabling Extruder",0.1)
+	coolDownExtruder()
+	trace("Disabling Extruder", log_trace)
 	macro("M302 S160","ok",1,"Disabling Cold Extrusion Prevention",0.1,verbose=False)
 	
 #jog setup procedure
@@ -315,7 +326,9 @@ elif preset=="shutdown":
 #probe calibration
 elif preset=="probe_setup_prepare":
 	trace("Preparing Calibration procedure",log_trace)
-	macro("M104 S200","ok",90,"Heating extruder",1)
+	#macro("M104 S200","ok",90,"Heating extruder",1)
+	heatUpExtruder()
+	trace("Heating Extruder", log_trace)
 	macro("M140 S70", "ok",90,"Heating Bed - fast ",20)
 	macro("G91","ok",2,"Relative mode",1)
 	macro("G0 X17 Y61.5 F6000","ok",2,"Offset",1)
@@ -324,7 +337,8 @@ elif preset=="probe_setup_prepare":
 	
 elif preset=="probe_setup_calibrate":
 	trace("Calibrating probe",log_trace)
-	macro("M104 S0","ok",90,"nozzle off",1,verbose=False)
+	#macro("M104 S0","ok",90,"nozzle off",1,verbose=False)
+	coolDownExtruder()
 	macro("M140 S0", "ok",90,"bed off ",1,verbose=False)
 	
 	#get old probe-nozzle height difference

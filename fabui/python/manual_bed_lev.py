@@ -19,12 +19,16 @@ except:
 #print "json: "+logfile
 #print "trace: "+log_trace
 
+#num of probes each point
+num_probes=4
+
 cycle=True
 s_warning=s_error=s_skipped=0
 
 screw_turns=["" for x in range(4)]
 screw_height=["" for x in range(4)]
 screw_degrees=["" for x in range(4)]
+screw_height_raw=[["" for x in range(0,num_probes)] for y in range(0,4)]
 
 #points to probe
 probed_points=np.array([[5+17,5+61.5,0],[5+17,148.5+61.5,0],[178+17,148.5+61.5,0],[178+17,5+61.5,0]])
@@ -33,8 +37,6 @@ screw_offset=[8.726,10.579,0]
 
 serial_reply=""
 
-#num of probes each point
-num_probes=4
 
 def trace(string):
 	global log_trace
@@ -50,7 +52,22 @@ def printlog():
 	global screw_turns
 	global screw_height
 	global screw_degrees
-	str_log='{"bed_calibration":{"t1": "'+str(screw_turns[0])+'","t2": "'+str(screw_turns[1])+'","t3": "'+str(screw_turns[2])+'","t4": "'+str(screw_turns[3])+'","s1": "'+str(screw_height[0])+'","s2": "'+str(screw_height[1])+'","s3": "'+str(screw_height[2])+'","s4": "'+str(screw_height[3])+'","d1": "'+str(screw_degrees[0])+'","d2": "'+str(screw_degrees[1])+'","d3": "'+str(screw_degrees[2])+'","d4": "'+str(screw_degrees[3])+'"}}'
+	str_log='{"bed_calibration":{"t1": "'+str(screw_turns[0])+'","t2": "'+str(screw_turns[1])+'","t3": "'+str(screw_turns[2])+'","t4": "'+str(screw_turns[3])+'","s1": "'+str(screw_height[0])+'","s2": "'+str(screw_height[1])+'","s3": "'+str(screw_height[2])+'","s4": "'+str(screw_height[3])+'","d1": "'+str(screw_degrees[0])+'","d2": "'+str(screw_degrees[1])+'","d3": "'+str(screw_degrees[2])+'","d4": "'+str(screw_degrees[3])+'", '
+	
+	
+	for screwNr in range(0,len(probed_points)):
+		str_log += '"screw_height_raw_'+str(screwNr)+'":'
+		str_log += ' ['
+		for measurementNr in range (0, num_probes):
+			str_log += '"'+screw_height_raw[screwNr][measurementNr]+'"'
+			if (measurementNr < num_probes-1):
+				str_log += ','
+		str_log += ']'
+		if (screwNr<len(probed_points)-1):
+			str_log +=', '
+	
+	str_log+='}}'
+
 	#write log
 	handle=open(logfile,'w+')
 	print>>handle, str_log
@@ -58,20 +75,20 @@ def printlog():
 
 def fitPlaneSVD(XYZ):
 	#unused
-    [rows,cols] = XYZ.shape
-    # Set up constraint equations of the form  AB = 0,
-    # where B is a column vector of the plane coefficients
-    # in the form b(1)*X + b(2)*Y +b(3)*Z + b(4) = 0.
-    p = (np.ones((rows,1)))
-    AB = np.hstack([XYZ,p])
-    [u, d, v] = np.linalg.svd(AB,0)        
-    B = v[3,:];                    # Solution is last column of v.
-    nn = np.linalg.norm(B[0:3])
-    B = B / nn
-    return B[0:3] #a b c
+	[rows,cols] = XYZ.shape
+	# Set up constraint equations of the form  AB = 0,
+	# where B is a column vector of the plane coefficients
+	# in the form b(1)*X + b(2)*Y +b(3)*Z + b(4) = 0.
+	p = (np.ones((rows,1)))
+	AB = np.hstack([XYZ,p])
+	[u, d, v] = np.linalg.svd(AB,0)		   
+	B = v[3,:];					   # Solution is last column of v.
+	nn = np.linalg.norm(B[0:3])
+	B = B / nn
+	return B[0:3] #a b c
 	
 from geometry import Point, Line, Plane
-     
+	 
 def fitplane(XYZ):
 	[npts,rows] = XYZ.shape
 
@@ -84,20 +101,20 @@ def fitplane(XYZ):
 		raise ('too few points to fit plane')
 		return None
 
-	# Set up constraint equations of the form  AB = 0,
+	# Set up constraint equations of the form	AB = 0,
 	
 	# where B is a column vector of the plane coefficients
-	# in the form   b(1)*X + b(2)*Y +b(3)*Z + b(4) = 0.
+	# in the form	 b(1)*X + b(2)*Y +b(3)*Z + b(4) = 0.
 	t = XYZ
 	p = (np.ones((npts,1)))
 	A = np.hstack([t,p])
 
-	if npts == 3:                       # Pad A with zeros
+	if npts == 3:						 # Pad A with zeros
 		A = [A, np.zeros(1,4)]
 
-	[u, d, v] = np.linalg.svd(A)        # Singular value decomposition.
+	[u, d, v] = np.linalg.svd(A)		 # Singular value decomposition.
 	#print v[3,:]
-	B = v[3,:];                         # Solution is last column of v.
+	B = v[3,:];						 # Solution is last column of v.
 	nn = np.linalg.norm(B[0:3])
 	B = B / nn
 	plane = Plane(Point(B[0],B[1],B[2]),D=B[3])
@@ -171,6 +188,8 @@ macro("G92 Z241.2","ok",5,"Setting correct Z",0.1, verbose=False)
 macro("M402","ok",2,"Retracting Probe (safety)",1, verbose=False)	
 macro("G0 Z60 F5000","ok",5,"Moving to start Z height",10) #mandatory!
 
+point_nr = 0
+
 for (p,point) in enumerate(probed_points):
 
 	#real carriage position
@@ -182,21 +201,24 @@ for (p,point) in enumerate(probed_points):
 	#Touches 4 times the bed in the same position
 	probes=num_probes #temp
 	for i in range(0,num_probes):
-		
+		# Raise probe first, to level out errors of probe retracts?!?
+		macro("M402","ok",2,"Raising Probe",1, warning=True, verbose=False)	
+
 		#M401
 		macro("M401","ok",2,"Lowering Probe",1, warning=True, verbose=False)	
 		
 		serial.flushInput()
 		#G30	
-		serial.write("G30\r\n")
-		#time.sleep(0.5)			#give it some to to start  
+		serial.write("G30 U50\r\n")
+		#time.sleep(0.5)			#give it some to to start	
 		probe_start_time = time.time()
 		while not serial_reply[:22]=="echo:endstops hit:  Z:":
 			serial_reply=serial.readline().rstrip()	
 			#issue G30 Xnn Ynn and waits reply.
-			if (time.time() - probe_start_time>20):  #timeout management
+			if (time.time() - probe_start_time>80):	#timeout management
 				trace("Probe failed on this point")
 				probes-=1 #failed, update counter
+				screw_height_raw[point_nr][i] = "N/A"
 				break	
 			pass
 			
@@ -204,6 +226,7 @@ for (p,point) in enumerate(probed_points):
 		#get the z position
 		if serial_reply!="":
 			z=float(serial_reply.split("Z:")[1].strip())
+			screw_height_raw[point_nr][i]=str(z)
 			#trace("probe no. "+str(i+1)+" = "+str(z) )
 			probed_points[p,2]+=z # store Z
 			
@@ -218,6 +241,8 @@ for (p,point) in enumerate(probed_points):
 	probed_points[p,1]=probed_points[p,1]
 	probed_points[p,2]=probed_points[p,2]/probes; #mean of the Z value on point "p"
 	
+	point_nr = point_nr +1
+
 	#trace("Mean ="+ str(probed_points[p,2]))
 	
 	#msg="Point " +str(p+1)+ "/"+ str(len(probed_points)) + " , Z= " +str(probed_points[p,2])
@@ -283,7 +308,8 @@ for (p,point) in enumerate(cal_point):
 		
 	#difference from titled plane to straight plane
 	#distance=P2-P1
-	diff=-d_ovr-abs(z)
+	# diff=-d_ovr-abs(z)
+	diff = abs(d_ovr)-abs(z)
 	
 	#msg= "d :"+str(d)+", P :"+str(p)+" , Z:" +str(z) +" Diff: "+str(diff) +" d_ovr: "+str(d_ovr) 
 	msg= str(d_ovr)+ "-"+str(abs(z))+" = " + str(diff)
@@ -304,7 +330,7 @@ for (p,point) in enumerate(cal_point):
 
 #save everything
 printlog()
-
+macro("M300","ok",1,"Done!",1,verbose=False) #end print signal
 #end
 trace("Done!")
 sys.exit()
