@@ -50,6 +50,7 @@ $route['plugin/(:any)']          = "$1";
 $route['maintenance/4-axis'] = "maintenance/fourthaxis";
 $route['maintenance/self-test'] = "maintenance/selftest";
 $route['maintenance/bed-calibration'] = "maintenance/bedcalibration";
+$route['maintenance/advanced-bed-calibration'] = "maintenance/advancedBedCalibration";
 $route['maintenance/probe-calibration'] = "maintenance/probecalibration";
 $route['maintenance/first-setup'] = "maintenance/firstsetup";
 /* End of file routes.php */
